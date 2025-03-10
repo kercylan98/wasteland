@@ -17,6 +17,9 @@ type ProcessLifecycle interface {
 
 	// Terminate 终止进程，当进程被终止时调用，参数是发起终止的进程 ID，否则使用自身 ID
 	Terminate(operator ProcessId)
+
+	// Terminated 检查进程是否已经终止
+	Terminated() bool
 }
 
 type ProcessHandler interface {

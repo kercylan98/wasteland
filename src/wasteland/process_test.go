@@ -15,6 +15,7 @@ type TestFnProcess struct {
 	OnTerminate          func(operator wasteland.ProcessId)
 	OnHandleMessage      func(sender wasteland.ProcessId, priority wasteland.MessagePriority, message wasteland.Message)
 	OnHandleAgentMessage func(sender, target wasteland.ProcessId, priority wasteland.MessagePriority, message wasteland.Message)
+	OnTerminated         func() bool
 }
 
 func (t *TestFnProcess) GetID() wasteland.ProcessId {
@@ -43,4 +44,11 @@ func (t *TestFnProcess) HandleAgentMessage(sender, target wasteland.ProcessId, p
 	if t.OnHandleAgentMessage != nil {
 		t.OnHandleAgentMessage(sender, target, priority, message)
 	}
+}
+
+func (t *TestFnProcess) Terminated() bool {
+	if t.OnTerminated != nil {
+		return t.OnTerminated()
+	}
+	return false
 }

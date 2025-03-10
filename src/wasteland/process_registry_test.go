@@ -12,7 +12,7 @@ func TestProcessRegistryImpl_Register(t *testing.T) {
 
 	registry := wasteland.ExportNewProcessRegistry(wasteland.ExportProcessRegistryConfig{
 		Meta: wasteland.ExportNewProcessIdMeta(&net.IPAddr{
-			IP: []byte{127, 0, 0, 1},
+			IP: []byte("127.0.0.1"),
 		}, 1, 1, 0, 0),
 		LoggerProvide: log.ProviderFn(func() log.Logger {
 			return log.GetDefault()
@@ -34,13 +34,9 @@ func TestProcessRegistryImpl_Register(t *testing.T) {
 		t.Error(err)
 		return
 	} else if err = registry.Register(&TestFnProcess{
-		ID:                   wasteland.ExportNewProcessId(registry.Meta(), "/test"),
-		OnInitialize:         nil,
-		OnTerminate:          nil,
-		OnHandleMessage:      nil,
-		OnHandleAgentMessage: nil,
+		ID: wasteland.ExportNewProcessId(registry.Meta(), "/test"),
 	}); err == nil { // SAME PATH
-		t.Error(errors.New("register same path"))
+		t.Error(errors.New("register same Path"))
 		return
 	}
 
