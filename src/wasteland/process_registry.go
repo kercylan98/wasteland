@@ -101,6 +101,15 @@ func (i *processRegistryImpl) Get(id ProcessId) (process Process, err error) {
 		}
 	}
 
+	// 远程解析
+	if id.Address() != i.config.Meta.Address() {
+		process = newRPCProcess(i, id)
+		if implCache {
+			cache.Store(process)
+		}
+		return process, nil
+	}
+
 	// 本地注册表加载
 	var loaded bool
 	if process, loaded = i.processes.Load(id.Path()); loaded {
