@@ -19,6 +19,10 @@ type Stream interface {
 
 	GetAddr() string
 
+	Encode(m any) (bytes []byte, err error)
+
+	Decode(m any, data []byte) (err error)
+
 	Close(rpc Serve)
 }
 
@@ -30,7 +34,17 @@ func newStream(stream StreamHandler) Stream {
 
 type streamImpl struct {
 	StreamHandler
-	addr string
+	addr  string
+	codec *codec
+}
+
+func (s *streamImpl) Encode(m any) (bytes []byte, err error) {
+	return s.codec.Encode(m)
+}
+
+func (s *streamImpl) Decode(m any, data []byte) (err error) {
+	m, err = s.codec.Decode(m, data)
+	return
 }
 
 func (s *streamImpl) GetAddr() string {
@@ -39,6 +53,7 @@ func (s *streamImpl) GetAddr() string {
 
 func (s *streamImpl) Initialize(addr string) {
 	s.addr = addr
+	s.codec = newCodec()
 }
 
 func (s *streamImpl) Close(rpc Serve) {

@@ -3,12 +3,17 @@ package wasteland
 import (
 	"fmt"
 	"github.com/kercylan98/go-log/log"
+	"github.com/kercylan98/wasteland/src/internal/rpc"
 	"github.com/puzpuzpuz/xsync/v3"
+	"net"
 )
 
 type ProcessRegistry interface {
 	// Meta 获取注册表的元数据
 	Meta() Meta
+
+	// Run 运行注册表
+	Run() (err error)
 
 	// Register 注册一个进程到注册表
 	Register(process Process) (err error)
@@ -18,6 +23,12 @@ type ProcessRegistry interface {
 
 	// Get 获取一个进程
 	Get(meta ProcessId) (process Process, err error)
+
+	// Stop 停止注册表
+	Stop()
+
+	// GracefulStop 优雅地停止注册表
+	GracefulStop()
 }
 
 type processRegistryConfig struct {
@@ -36,6 +47,36 @@ func newProcessRegistry(config processRegistryConfig) ProcessRegistry {
 type processRegistryImpl struct {
 	config    processRegistryConfig
 	processes *xsync.MapOf[Path, Process] // 用于存储所有进程的映射表
+	rpc       rpc.RPC                     // RPC 服务（仅在 addr 不为空时才创建）
+}
+
+func (i *processRegistryImpl) Run() (err error) {
+	addr := i.config.Meta.Address()
+	if addr != "" {
+		rpcConfig := rpc.Config{
+			Handler: rpc.HandlerFn(i.rpcMessageHandle),
+			Logger:  i.config.LoggerProvide,
+		}
+		if rpcConfig.Listener, err = net.Listen("tcp", addr); err != nil {
+			return err
+		}
+
+		i.rpc = rpc.New(rpcConfig)
+		return i.rpc.Run()
+	}
+	return
+}
+
+func (i *processRegistryImpl) Stop() {
+	if i.rpc != nil {
+		i.rpc.Stop()
+	}
+}
+
+func (i *processRegistryImpl) GracefulStop() {
+	if i.rpc != nil {
+		i.rpc.GracefulStop()
+	}
 }
 
 func (i *processRegistryImpl) Get(id ProcessId) (process Process, err error) {
@@ -116,5 +157,25 @@ func (i *processRegistryImpl) Unregister(operator, target ProcessId) {
 			logger.Debug("*processRegistryImpl.Unregister", log.String("event", "terminate"), log.String("process", target.Path()))
 			cast.Terminate(operator)
 		}
+	}
+}
+
+func (i *processRegistryImpl) rpcMessageHandle(stream rpc.Stream, data []byte) {
+	var msg = new(rpcMessage)
+	if err := stream.Decode(msg, data); err != nil {
+		i.config.LoggerProvide.Provide().Error("rpcMessageHandle", log.String("event", "decode"), log.Err(err))
+		return
+	}
+
+	process, err := i.Get(msg.Target)
+	if err != nil {
+		i.config.LoggerProvide.Provide().Error("rpcMessageHandle", log.String("event", "get"), log.Err(err))
+		return
+	}
+
+	if handler, cast := process.(ProcessHandler); cast {
+		handler.HandleMessage(msg.Sender, msg.Priority, msg.Message)
+	} else {
+		i.config.LoggerProvide.Provide().Warn("rpcMessageHandle", log.String("event", "cast"), log.String("process", msg.Target.Path()))
 	}
 }

@@ -1,11 +1,11 @@
 package rpc
 
 type Handler interface {
-	Handle(message []byte)
+	Handle(stream Stream, message []byte)
 }
 
-type HandlerFn func(message []byte)
+type HandlerFn func(stream Stream, message []byte)
 
-func (f HandlerFn) Handle(message []byte) {
-	f(message)
+func (f HandlerFn) Handle(stream Stream, message []byte) {
+	f(stream, message)
 }

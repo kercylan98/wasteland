@@ -14,9 +14,15 @@ import (
 )
 
 type RPC interface {
-	Run()
+	Run() (err error)
 
-	Get(addr string) (Stream, error)
+	Get(addr string) (stream Stream, err error)
+
+	Stop()
+
+	CloseStream(stream Stream)
+
+	GracefulStop()
 }
 
 type Serve interface {
@@ -52,16 +58,24 @@ type rpcImpl struct {
 	grpc    *grpc.Server
 }
 
-func (r *rpcImpl) Run() {
+func (r *rpcImpl) CloseStream(stream Stream) {
+	stream.Close(r)
+}
+
+func (r *rpcImpl) Run() (err error) {
 	r.grpc = grpc.NewServer()
 	r.grpc.RegisterService(&protobuf.RPCService_ServiceDesc, &server{rpc: r})
 
 	r.addr = r.config.Listener.Addr()
-	go func() {
-		if err := r.grpc.Serve(r.config.Listener); err != nil {
-			panic(err)
-		}
-	}()
+	return r.grpc.Serve(r.config.Listener)
+}
+
+func (r *rpcImpl) Stop() {
+	r.grpc.Stop()
+}
+
+func (r *rpcImpl) GracefulStop() {
+	r.grpc.GracefulStop()
 }
 
 // Bind 绑定远程流
@@ -91,7 +105,7 @@ func (r *rpcImpl) Unbind(stream Stream) {
 	}
 }
 
-func (r *rpcImpl) Get(addr string) (Stream, error) {
+func (r *rpcImpl) Get(addr string) (stream Stream, err error) {
 	// 采用读锁获取目标，避免每次获取都加写锁，需要使用双重校验来确保不会重复创建
 	r.rw.RLock()
 	if streams, ok := r.streams[addr]; ok {
@@ -106,7 +120,7 @@ func (r *rpcImpl) Get(addr string) (Stream, error) {
 		}
 	}
 	r.rw.RUnlock()
-	if stream, err := r.createRemoteStream(addr); err != nil {
+	if stream, err = r.createRemoteStream(addr); err != nil {
 		r.config.Logger.Provide().Warn("remote", log.String("event", "dial"), log.String("addr", addr), log.Any("info", "retrying on a continuous basis"), log.Any("err", err))
 		return nil, err
 	} else {
@@ -235,10 +249,10 @@ func (r *rpcImpl) handleMessage(stream Stream, message *protobuf.Message) {
 
 func (r *rpcImpl) onStreamBatchMessage(stream Stream, batch *protobuf.Message_Batch) {
 	for _, messageBytes := range batch.Messages {
-		r.config.Handler.Handle(messageBytes)
+		r.config.Handler.Handle(stream, messageBytes)
 	}
 }
 
 func (r *rpcImpl) onStreamFarewellMessage(stream Stream, farewell *protobuf.Message_Farewell) {
-
+	
 }
