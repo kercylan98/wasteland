@@ -1,9 +1,7 @@
 package wasteland
 
-import "net"
-
 type (
-	Address   = net.Addr
+	Address   = string
 	Path      = string
 	Zone      = uint8
 	Version   = uint8
