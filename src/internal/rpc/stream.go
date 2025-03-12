@@ -2,6 +2,7 @@ package rpc
 
 import (
 	"github.com/kercylan98/wasteland/src/internal/protobuf/protobuf"
+	"google.golang.org/grpc"
 )
 
 var _ Stream = (*streamImpl)(nil)
@@ -26,9 +27,10 @@ type Stream interface {
 	Close(rpc Serve)
 }
 
-func newStream(stream StreamHandler) Stream {
+func newStream(stream StreamHandler, cc *grpc.ClientConn) Stream {
 	return &streamImpl{
 		StreamHandler: stream,
+		cc:            cc,
 	}
 }
 
@@ -36,6 +38,7 @@ type streamImpl struct {
 	StreamHandler
 	addr  string
 	codec *codec
+	cc    *grpc.ClientConn
 }
 
 func (s *streamImpl) Encode(m any) (bytes []byte, err error) {
@@ -60,5 +63,8 @@ func (s *streamImpl) Close(rpc Serve) {
 	_ = s.StreamHandler.CloseSend()
 	if s.addr != "" {
 		rpc.Unbind(s)
+	}
+	if s.cc != nil {
+		_ = s.cc.Close()
 	}
 }

@@ -234,7 +234,7 @@ func (r *rpcImpl) openRemoteStream(addr string) (Stream, error) {
 		return nil, err
 	}
 
-	return newStream(server), nil
+	return newStream(server, cc), nil
 }
 
 // handleMessage 处理远程流消息
@@ -254,5 +254,5 @@ func (r *rpcImpl) onStreamBatchMessage(stream Stream, batch *protobuf.Message_Ba
 }
 
 func (r *rpcImpl) onStreamFarewellMessage(stream Stream, farewell *protobuf.Message_Farewell) {
-	
+
 }

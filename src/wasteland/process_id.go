@@ -21,6 +21,10 @@ type ProcessIdCache interface {
 	Store(process Process)
 }
 
+func NewProcessId(meta Meta, path Path) ProcessId {
+	return newProcessId(meta, path)
+}
+
 func newProcessId(meta Meta, path Path) ProcessId {
 	return &processIdImpl{
 		Meta:   meta,

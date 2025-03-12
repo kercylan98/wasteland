@@ -18,8 +18,9 @@ const (
 )
 
 var (
-	_ Process        = (*rpcProcess)(nil)
-	_ ProcessHandler = (*rpcProcess)(nil)
+	_ Process             = (*rpcProcess)(nil)
+	_ ProcessHandler      = (*rpcProcess)(nil)
+	_ ProcessMessageAgent = (*rpcProcess)(nil)
 )
 
 func newRPCProcess(registry *processRegistryImpl, id ProcessId) Process {
@@ -30,14 +31,13 @@ func newRPCProcess(registry *processRegistryImpl, id ProcessId) Process {
 }
 
 type rpcProcess struct {
-	id       ProcessId
-	registry *processRegistryImpl
-
-	stream         rpc.Stream
-	batch          []*rpcMessage  // 批量消息
-	rw             sync.RWMutex   // 读写锁
-	state          atomic.Uint32  // 状态
-	recoveryWaiter sync.WaitGroup // 恢复等待组
+	id             ProcessId            // 指向远端进程的 ID
+	registry       *processRegistryImpl // 注册表
+	stream         rpc.Stream           // 远程流
+	batch          []*rpcMessage        // 批量消息
+	rw             sync.RWMutex         // 读写锁
+	state          atomic.Uint32        // 状态
+	recoveryWaiter sync.WaitGroup       // 恢复等待组
 }
 
 func (r *rpcProcess) GetID() ProcessId {
@@ -45,8 +45,28 @@ func (r *rpcProcess) GetID() ProcessId {
 }
 
 func (r *rpcProcess) HandleMessage(sender ProcessId, priority MessagePriority, message Message) {
-	//TODO implement me
-	panic("implement me")
+	r.rw.Lock()
+	r.batch = append(r.batch, &rpcMessage{
+		Sender:   sender,
+		Target:   r.id,
+		Priority: priority,
+		Message:  message,
+	})
+	r.rw.Unlock()
+	r.activation()
+}
+
+func (r *rpcProcess) HandleAgentMessage(agent, sender ProcessId, priority MessagePriority, message Message) {
+	r.rw.Lock()
+	r.batch = append(r.batch, &rpcMessage{
+		Sender:   sender,
+		Target:   r.id,
+		Agent:    agent,
+		Priority: priority,
+		Message:  message,
+	})
+	r.rw.Unlock()
+	r.activation()
 }
 
 func (r *rpcProcess) activation() {

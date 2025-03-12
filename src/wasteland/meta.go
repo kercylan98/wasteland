@@ -1,5 +1,7 @@
 package wasteland
 
+import "time"
+
 type Meta interface {
 	Address() Address
 
@@ -10,6 +12,22 @@ type Meta interface {
 	LaunchAt() Timestamp
 
 	Gen() Gen
+}
+
+func NewMeta(address Address) Meta {
+	return newMeta(address, 0, 0, time.Now().Unix(), 0)
+}
+
+func NewZoneMeta(address Address, zone Zone) Meta {
+	return newMeta(address, zone, 0, time.Now().Unix(), 0)
+}
+
+func NewVersionMeta(address Address, version Version) Meta {
+	return newMeta(address, 0, version, time.Now().Unix(), 0)
+}
+
+func NewZoneVersionMeta(address Address, zone Zone, version Version) Meta {
+	return newMeta(address, zone, version, time.Now().Unix(), 0)
 }
 
 func newMeta(address Address, zone Zone, version Version, launchAt Timestamp, gen Gen) Meta {

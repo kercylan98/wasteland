@@ -31,13 +31,13 @@ type ProcessRegistry interface {
 	GracefulStop()
 }
 
-type processRegistryConfig struct {
+type ProcessRegistryConfig struct {
 	Meta          Meta
 	Daemon        Process
 	LoggerProvide log.Provider
 }
 
-func newProcessRegistry(config processRegistryConfig) ProcessRegistry {
+func NewProcessRegistry(config ProcessRegistryConfig) ProcessRegistry {
 	return &processRegistryImpl{
 		config:    config,
 		processes: xsync.NewMapOf[Path, Process](),
@@ -45,7 +45,7 @@ func newProcessRegistry(config processRegistryConfig) ProcessRegistry {
 }
 
 type processRegistryImpl struct {
-	config    processRegistryConfig
+	config    ProcessRegistryConfig
 	processes *xsync.MapOf[Path, Process] // 用于存储所有进程的映射表
 	rpc       rpc.RPC                     // RPC 服务（仅在 addr 不为空时才创建）
 }
@@ -182,9 +182,17 @@ func (i *processRegistryImpl) rpcMessageHandle(stream rpc.Stream, data []byte) {
 		return
 	}
 
-	if handler, cast := process.(ProcessHandler); cast {
-		handler.HandleMessage(msg.Sender, msg.Priority, msg.Message)
+	if msg.Agent != nil {
+		if handler, cast := process.(ProcessMessageAgent); cast {
+			handler.HandleAgentMessage(msg.Sender, msg.Target, msg.Priority, msg.Message)
+		} else {
+			i.config.LoggerProvide.Provide().Warn("rpcMessageHandle", log.String("event", "cast"), log.String("process", msg.Target.Path()))
+		}
 	} else {
-		i.config.LoggerProvide.Provide().Warn("rpcMessageHandle", log.String("event", "cast"), log.String("process", msg.Target.Path()))
+		if handler, cast := process.(ProcessHandler); cast {
+			handler.HandleMessage(msg.Sender, msg.Priority, msg.Message)
+		} else {
+			i.config.LoggerProvide.Provide().Warn("rpcMessageHandle", log.String("event", "cast"), log.String("process", msg.Target.Path()))
+		}
 	}
 }
