@@ -39,7 +39,11 @@ type processIdImpl struct {
 }
 
 func (p *processIdImpl) Load() Process {
-	return *p.cache.Load()
+	v := p.cache.Load()
+	if v == nil {
+		return nil
+	}
+	return *v
 }
 
 func (p *processIdImpl) Store(process Process) {

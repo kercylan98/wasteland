@@ -38,6 +38,9 @@ type ProcessRegistryConfig struct {
 }
 
 func NewProcessRegistry(config ProcessRegistryConfig) ProcessRegistry {
+	if config.LoggerProvide == nil {
+		config.LoggerProvide = log.ProviderFn(log.GetDefault)
+	}
 	return &processRegistryImpl{
 		config:    config,
 		processes: xsync.NewMapOf[Path, Process](),
