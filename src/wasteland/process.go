@@ -27,9 +27,3 @@ type ProcessHandler interface {
 
 	HandleMessage(sender ProcessId, priority MessagePriority, message Message)
 }
-
-type ProcessMessageAgent interface {
-	Process
-
-	HandleAgentMessage(agent, sender ProcessId, priority MessagePriority, message Message)
-}

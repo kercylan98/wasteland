@@ -185,17 +185,9 @@ func (i *processRegistryImpl) rpcMessageHandle(stream rpc.Stream, data []byte) {
 		return
 	}
 
-	if msg.Agent != nil {
-		if handler, cast := process.(ProcessMessageAgent); cast {
-			handler.HandleAgentMessage(msg.Sender, msg.Target, msg.Priority, msg.Message)
-		} else {
-			i.config.LoggerProvide.Provide().Warn("rpcMessageHandle", log.String("event", "cast"), log.String("process", msg.Target.Path()))
-		}
+	if handler, cast := process.(ProcessHandler); cast {
+		handler.HandleMessage(msg.Sender, msg.Priority, msg.Message)
 	} else {
-		if handler, cast := process.(ProcessHandler); cast {
-			handler.HandleMessage(msg.Sender, msg.Priority, msg.Message)
-		} else {
-			i.config.LoggerProvide.Provide().Warn("rpcMessageHandle", log.String("event", "cast"), log.String("process", msg.Target.Path()))
-		}
+		i.config.LoggerProvide.Provide().Warn("rpcMessageHandle", log.String("event", "cast"), log.String("process", msg.Target.Path()))
 	}
 }

@@ -18,9 +18,8 @@ const (
 )
 
 var (
-	_ Process             = (*rpcProcess)(nil)
-	_ ProcessHandler      = (*rpcProcess)(nil)
-	_ ProcessMessageAgent = (*rpcProcess)(nil)
+	_ Process        = (*rpcProcess)(nil)
+	_ ProcessHandler = (*rpcProcess)(nil)
 )
 
 func newRPCProcess(registry *processRegistryImpl, id ProcessId) Process {
@@ -49,19 +48,6 @@ func (r *rpcProcess) HandleMessage(sender ProcessId, priority MessagePriority, m
 	r.batch = append(r.batch, &rpcMessage{
 		Sender:   sender,
 		Target:   r.id,
-		Priority: priority,
-		Message:  message,
-	})
-	r.rw.Unlock()
-	r.activation()
-}
-
-func (r *rpcProcess) HandleAgentMessage(agent, sender ProcessId, priority MessagePriority, message Message) {
-	r.rw.Lock()
-	r.batch = append(r.batch, &rpcMessage{
-		Sender:   sender,
-		Target:   r.id,
-		Agent:    agent,
 		Priority: priority,
 		Message:  message,
 	})
