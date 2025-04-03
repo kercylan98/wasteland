@@ -1,11 +1,13 @@
 package wasteland
 
-import "github.com/kercylan98/wasteland/src/internal/rpc"
+import (
+	"encoding/gob"
+)
 
 func init() {
-	rpc.RegisterName("w:metaImpl", &metaImpl{})
-	rpc.RegisterName("w:processIdImpl", &processIdImpl{})
-	rpc.RegisterName("w:rpcMessage", &rpcMessage{})
+	gob.RegisterName("w:metaImpl", &metaImpl{})
+	gob.RegisterName("w:processIdImpl", &processIdImpl{})
+	gob.RegisterName("w:rpcMessage", &rpcMessage{})
 }
 
 type rpcMessage struct {

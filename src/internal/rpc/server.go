@@ -8,7 +8,8 @@ var _ protobuf.RPCServiceServer = (*server)(nil)
 
 type server struct {
 	*protobuf.UnimplementedRPCServiceServer
-	rpc Serve
+	rpc           Serve
+	codecProvider CodecProvider
 }
 
 func (s *server) OpenStream(oss protobuf.RPCService_OpenStreamServer) error {
@@ -16,7 +17,7 @@ func (s *server) OpenStream(oss protobuf.RPCService_OpenStreamServer) error {
 	if handshake, err := s.rpc.WaitHandshake(stream); err != nil {
 		return err
 	} else {
-		stream.Initialize(handshake.Address)
+		stream.Initialize(handshake.Address, s.codecProvider)
 		s.rpc.Bind(stream)
 		s.rpc.ListenMessage(stream)
 		return nil

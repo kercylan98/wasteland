@@ -5,12 +5,27 @@ import (
 	"encoding/gob"
 )
 
-func RegisterType(t any) {
-	gob.Register(t)
+// Codec 是用于对消息发送前和接收后进行编码和解码的接口
+type Codec interface {
+	// Encode 编码消息
+	Encode(m any) (bytes []byte, err error)
+
+	// Decode 解码消息
+	Decode(m any, data []byte) (res any, err error)
 }
 
-func RegisterName(name string, t any) {
-	gob.RegisterName(name, t)
+// CodecProvider 是用于创建 Codec 的接口
+type CodecProvider interface {
+	// Provide 创建 Codec
+	Provide() Codec
+}
+
+// CodecProviderFN 是 CodecProvider 的函数实现
+type CodecProviderFN func() Codec
+
+// Provide 实现 CodecProvider 接口
+func (fn CodecProviderFN) Provide() Codec {
+	return fn()
 }
 
 func newCodec() *codec {

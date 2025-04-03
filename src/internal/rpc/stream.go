@@ -16,7 +16,7 @@ type StreamHandler interface {
 type Stream interface {
 	StreamHandler
 
-	Initialize(addr string)
+	Initialize(addr string, provider CodecProvider)
 
 	GetAddr() string
 
@@ -36,9 +36,9 @@ func newStream(stream StreamHandler, cc *grpc.ClientConn) Stream {
 
 type streamImpl struct {
 	StreamHandler
-	addr  string
-	codec *codec
+	codec Codec
 	cc    *grpc.ClientConn
+	addr  string
 }
 
 func (s *streamImpl) Encode(m any) (bytes []byte, err error) {
@@ -54,9 +54,9 @@ func (s *streamImpl) GetAddr() string {
 	return s.addr
 }
 
-func (s *streamImpl) Initialize(addr string) {
+func (s *streamImpl) Initialize(addr string, provider CodecProvider) {
 	s.addr = addr
-	s.codec = newCodec()
+	s.codec = provider.Provide()
 }
 
 func (s *streamImpl) Close(rpc Serve) {

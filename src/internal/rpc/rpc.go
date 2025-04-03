@@ -38,12 +38,18 @@ type Serve interface {
 }
 
 type Config struct {
-	Handler  Handler
-	Listener net.Listener
-	Logger   log.Provider
+	Handler       Handler
+	Listener      net.Listener
+	Logger        log.Provider
+	CodecProvider CodecProvider
 }
 
 func New(config Config) RPC {
+	if config.CodecProvider == nil {
+		config.CodecProvider = CodecProviderFN(func() Codec {
+			return newCodec()
+		})
+	}
 	return &rpcImpl{
 		config:  config,
 		streams: make(map[string][]Stream),
@@ -64,7 +70,7 @@ func (r *rpcImpl) CloseStream(stream Stream) {
 
 func (r *rpcImpl) Run() (err error) {
 	r.grpc = grpc.NewServer()
-	r.grpc.RegisterService(&protobuf.RPCService_ServiceDesc, &server{rpc: r})
+	r.grpc.RegisterService(&protobuf.RPCService_ServiceDesc, &server{rpc: r, codecProvider: r.config.CodecProvider})
 
 	r.addr = r.config.Listener.Addr()
 	return r.grpc.Serve(r.config.Listener)
@@ -156,7 +162,7 @@ func (r *rpcImpl) createRemoteStream(addr string) (Stream, error) {
 		stream.Close(r)
 		return nil, err
 	} else {
-		stream.Initialize(handshake.Address)
+		stream.Initialize(handshake.Address, r.config.CodecProvider)
 		r.Bind(stream)
 	}
 

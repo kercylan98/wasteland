@@ -35,6 +35,7 @@ type ProcessRegistryConfig struct {
 	Meta          Meta
 	Daemon        Process
 	LoggerProvide log.Provider
+	CodecProvider CodecProvider
 }
 
 func NewProcessRegistry(config ProcessRegistryConfig) ProcessRegistry {
@@ -57,8 +58,9 @@ func (i *processRegistryImpl) Run() (err error) {
 	addr := i.config.Meta.Address()
 	if addr != "" {
 		rpcConfig := rpc.Config{
-			Handler: rpc.HandlerFn(i.rpcMessageHandle),
-			Logger:  i.config.LoggerProvide,
+			CodecProvider: i.config.CodecProvider,
+			Handler:       rpc.HandlerFn(i.rpcMessageHandle),
+			Logger:        i.config.LoggerProvide,
 		}
 		if rpcConfig.Listener, err = net.Listen("tcp", addr); err != nil {
 			return err
