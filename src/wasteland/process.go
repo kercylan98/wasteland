@@ -1,12 +1,8 @@
 package wasteland
 
-type ProcessMeta interface {
-	// GetID 返回这个进程的唯一标识
-	GetID() ProcessId
-}
-
 type Process interface {
-	ProcessMeta
+	// GetID 返回这个进程的唯一标识
+	GetID() ResourceLocator
 }
 
 type ProcessLifecycle interface {
@@ -16,7 +12,7 @@ type ProcessLifecycle interface {
 	Initialize()
 
 	// Terminate 终止进程，当进程被终止时调用，参数是发起终止的进程 ID，否则使用自身 ID
-	Terminate(operator ProcessId)
+	Terminate(operator ResourceLocator)
 
 	// Terminated 检查进程是否已经终止
 	Terminated() bool
@@ -25,5 +21,5 @@ type ProcessLifecycle interface {
 type ProcessHandler interface {
 	Process
 
-	HandleMessage(sender ProcessId, priority MessagePriority, message Message)
+	HandleMessage(sender ResourceLocator, priority MessagePriority, message Message)
 }

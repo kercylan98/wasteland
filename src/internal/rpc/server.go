@@ -13,7 +13,7 @@ type server struct {
 }
 
 func (s *server) OpenStream(oss protobuf.RPCService_OpenStreamServer) error {
-	stream := newStream(oss.(*protobuf.RPCStream), nil)
+	stream := newStream(&protobuf.RPCStream{RPCService_OpenStreamServer: oss}, nil)
 	if handshake, err := s.rpc.WaitHandshake(stream); err != nil {
 		return err
 	} else {

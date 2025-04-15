@@ -15,14 +15,11 @@ type StreamHandler interface {
 
 type Stream interface {
 	StreamHandler
+	Codec
 
 	Initialize(addr string, provider CodecProvider)
 
 	GetAddr() string
-
-	Encode(m any) (bytes []byte, err error)
-
-	Decode(m any, data []byte) (err error)
 
 	Close(rpc Serve)
 }
@@ -41,13 +38,12 @@ type streamImpl struct {
 	addr  string
 }
 
-func (s *streamImpl) Encode(m any) (bytes []byte, err error) {
+func (s *streamImpl) Encode(m any) (typeName string, bytes []byte, err error) {
 	return s.codec.Encode(m)
 }
 
-func (s *streamImpl) Decode(m any, data []byte) (err error) {
-	m, err = s.codec.Decode(m, data)
-	return
+func (s *streamImpl) Decode(typeName string, data []byte) (m any, err error) {
+	return s.codec.Decode(typeName, data)
 }
 
 func (s *streamImpl) GetAddr() string {

@@ -3,14 +3,15 @@ package wasteland
 import (
 	"fmt"
 	"github.com/kercylan98/go-log/log"
+	"github.com/kercylan98/wasteland/src/internal/protobuf/protobuf"
 	"github.com/kercylan98/wasteland/src/internal/rpc"
 	"github.com/puzpuzpuz/xsync/v3"
 	"net"
 )
 
 type ProcessRegistry interface {
-	// Meta 获取注册表的元数据
-	Meta() Meta
+	// ResourceLocator 获取注册表的资源定位符
+	ResourceLocator() ResourceLocator
 
 	// Run 运行注册表
 	Run() (err error)
@@ -19,10 +20,10 @@ type ProcessRegistry interface {
 	Register(process Process) (err error)
 
 	// Unregister 从注册表中注销一个进程
-	Unregister(operator, target ProcessId)
+	Unregister(operator, target ResourceLocator)
 
 	// Get 获取一个进程
-	Get(meta ProcessId) (process Process, err error)
+	Get(meta ResourceLocator) (process Process, err error)
 
 	// Stop 停止注册表
 	Stop()
@@ -32,10 +33,11 @@ type ProcessRegistry interface {
 }
 
 type ProcessRegistryConfig struct {
-	Meta          Meta
-	Daemon        Process
-	LoggerProvide log.Provider
-	CodecProvider CodecProvider
+	Locator           ResourceLocator
+	Daemon            Process
+	LoggerProvide     log.Provider
+	CodecProvider     CodecProvider
+	RPCMessageBuilder RPCMessageBuilder
 }
 
 func NewProcessRegistry(config ProcessRegistryConfig) ProcessRegistry {
@@ -55,7 +57,7 @@ type processRegistryImpl struct {
 }
 
 func (i *processRegistryImpl) Run() (err error) {
-	addr := i.config.Meta.Address()
+	addr := i.config.Locator.Address()
 	if addr != "" {
 		rpcConfig := rpc.Config{
 			CodecProvider: i.config.CodecProvider,
@@ -84,13 +86,13 @@ func (i *processRegistryImpl) GracefulStop() {
 	}
 }
 
-func (i *processRegistryImpl) Get(id ProcessId) (process Process, err error) {
+func (i *processRegistryImpl) Get(id ResourceLocator) (process Process, err error) {
 	if id == nil {
 		return i.daemon()
 	}
 
 	// 通过缓存加载
-	cache, implCache := id.(ProcessIdCache)
+	cache, implCache := id.(ResourceCache)
 	if implCache {
 		if process = cache.Load(); process != nil {
 			lifecycle, impl := process.(ProcessLifecycle)
@@ -107,7 +109,7 @@ func (i *processRegistryImpl) Get(id ProcessId) (process Process, err error) {
 	}
 
 	// 远程解析
-	if id.Address() != i.config.Meta.Address() {
+	if id.Address() != i.config.Locator.Address() {
 		process = newRPCProcess(i, id)
 		if implCache {
 			cache.Store(process)
@@ -134,8 +136,8 @@ func (i *processRegistryImpl) daemon() (process Process, err error) {
 	return i.config.Daemon, nil
 }
 
-func (i *processRegistryImpl) Meta() Meta {
-	return i.config.Meta
+func (i *processRegistryImpl) ResourceLocator() ResourceLocator {
+	return i.config.Locator
 }
 
 func (i *processRegistryImpl) Register(process Process) (err error) {
@@ -156,7 +158,7 @@ func (i *processRegistryImpl) Register(process Process) (err error) {
 	return nil
 }
 
-func (i *processRegistryImpl) Unregister(operator, target ProcessId) {
+func (i *processRegistryImpl) Unregister(operator, target ResourceLocator) {
 	if target == nil {
 		return
 	}
@@ -174,22 +176,26 @@ func (i *processRegistryImpl) Unregister(operator, target ProcessId) {
 	}
 }
 
-func (i *processRegistryImpl) rpcMessageHandle(stream rpc.Stream, data []byte) {
-	var msg = new(rpcMessage)
-	if err := stream.Decode(msg, data); err != nil {
+func (i *processRegistryImpl) rpcMessageHandle(stream rpc.Stream, message *protobuf.Message_BatchEntry) {
+	msg, err := stream.Decode(message.TypeName, message.Message)
+	if err != nil {
 		i.config.LoggerProvide.Provide().Error("rpcMessageHandle", log.String("event", "decode"), log.Err(err))
 		return
 	}
 
-	process, err := i.Get(msg.Target)
+	process, err := i.Get(NewResourceLocator(message.ReceiverAddr, message.ReceiverPath))
 	if err != nil {
 		i.config.LoggerProvide.Provide().Error("rpcMessageHandle", log.String("event", "get"), log.Err(err))
 		return
 	}
 
 	if handler, cast := process.(ProcessHandler); cast {
-		handler.HandleMessage(msg.Sender, msg.Priority, msg.Message)
+		var sender ResourceLocator
+		if message.SenderAddr != "" {
+			sender = NewResourceLocator(message.SenderAddr, message.SenderPath)
+		}
+		handler.HandleMessage(sender, message.Priority, msg)
 	} else {
-		i.config.LoggerProvide.Provide().Warn("rpcMessageHandle", log.String("event", "cast"), log.String("process", msg.Target.Path()))
+		i.config.LoggerProvide.Provide().Warn("rpcMessageHandle", log.String("event", "cast"), log.String("process", message.ReceiverPath))
 	}
 }

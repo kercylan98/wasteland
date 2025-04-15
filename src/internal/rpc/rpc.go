@@ -254,8 +254,8 @@ func (r *rpcImpl) handleMessage(stream Stream, message *protobuf.Message) {
 }
 
 func (r *rpcImpl) onStreamBatchMessage(stream Stream, batch *protobuf.Message_Batch) {
-	for _, messageBytes := range batch.Messages {
-		r.config.Handler.Handle(stream, messageBytes)
+	for _, entry := range batch.Entries {
+		r.config.Handler.Handle(stream, entry)
 	}
 }
 

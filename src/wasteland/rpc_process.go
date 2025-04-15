@@ -22,7 +22,7 @@ var (
 	_ ProcessHandler = (*rpcProcess)(nil)
 )
 
-func newRPCProcess(registry *processRegistryImpl, id ProcessId) Process {
+func newRPCProcess(registry *processRegistryImpl, id ResourceLocator) Process {
 	return &rpcProcess{
 		id:       id,
 		registry: registry,
@@ -30,26 +30,34 @@ func newRPCProcess(registry *processRegistryImpl, id ProcessId) Process {
 }
 
 type rpcProcess struct {
-	id             ProcessId            // 指向远端进程的 ID
-	registry       *processRegistryImpl // 注册表
-	stream         rpc.Stream           // 远程流
-	batch          []*rpcMessage        // 批量消息
-	rw             sync.RWMutex         // 读写锁
-	state          atomic.Uint32        // 状态
-	recoveryWaiter sync.WaitGroup       // 恢复等待组
+	id             ResourceLocator                // 指向远端进程的 ID
+	registry       *processRegistryImpl           // 注册表
+	stream         rpc.Stream                     // 远程流
+	batch          []*protobuf.Message_BatchEntry // 批量消息
+	rw             sync.RWMutex                   // 读写锁
+	state          atomic.Uint32                  // 状态
+	recoveryWaiter sync.WaitGroup                 // 恢复等待组
 }
 
-func (r *rpcProcess) GetID() ProcessId {
+func (r *rpcProcess) GetID() ResourceLocator {
 	return r.id
 }
 
-func (r *rpcProcess) HandleMessage(sender ProcessId, priority MessagePriority, message Message) {
+func (r *rpcProcess) HandleMessage(sender ResourceLocator, priority MessagePriority, message Message) {
+	typeName, buf, err := r.stream.Encode(message)
+	if err != nil {
+		r.registry.config.LoggerProvide.Provide().Error("remote", log.String("event", "send"), log.String("addr", r.id.Address()), log.String("info", "encode message error"), log.Err(err))
+		return
+	}
+
 	r.rw.Lock()
-	r.batch = append(r.batch, &rpcMessage{
-		Sender:   sender,
-		Target:   r.id,
-		Priority: priority,
-		Message:  message,
+	r.batch = append(r.batch, &protobuf.Message_BatchEntry{
+		SenderAddr:   sender.Address(),
+		SenderPath:   sender.Path(),
+		ReceiverAddr: r.id.Address(),
+		ReceiverPath: r.id.Path(),
+		TypeName:     typeName,
+		Message:      buf,
 	})
 	r.rw.Unlock()
 	r.activation()
@@ -88,7 +96,7 @@ func (r *rpcProcess) send() (stop bool) {
 	for {
 		r.rw.Lock()
 		n := len(r.batch)
-		var batch []*rpcMessage
+		var batch []*protobuf.Message_BatchEntry
 		if n < rpcMessageBatchLimit {
 			batch = r.batch
 			r.batch = nil
@@ -122,15 +130,7 @@ func (r *rpcProcess) send() (stop bool) {
 			// 如果获取远程流失败或者发送消息失败，进入下一次重试
 			if err == nil {
 				if m == nil {
-					var batchBytes = make([][]byte, 0, len(batch))
-					for _, msg := range batch {
-						data, err := stream.Encode(msg)
-						if err != nil {
-							panic(err)
-						}
-						batchBytes = append(batchBytes, data)
-					}
-					m = &protobuf.Message{MessageType: &protobuf.Message_Batch_{Batch: &protobuf.Message_Batch{Messages: batchBytes}}}
+					m = &protobuf.Message{MessageType: &protobuf.Message_Batch_{Batch: &protobuf.Message_Batch{Entries: batch}}}
 				}
 
 				if err = stream.Send(m); err != nil {

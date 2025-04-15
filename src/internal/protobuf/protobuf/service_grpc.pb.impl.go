@@ -1,7 +1,9 @@
 package protobuf
 
-type RPCStream = rPCServiceOpenStreamServer
+type RPCStream struct {
+	RPCService_OpenStreamServer
+}
 
-func (*rPCServiceOpenStreamServer) CloseSend() error {
+func (*RPCStream) CloseSend() error {
 	return nil
 }

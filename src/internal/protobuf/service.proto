@@ -1,4 +1,4 @@
-// protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative shared.proto
+// protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative service.proto
 syntax = "proto3";
 package src.internal.protobuf.protobuf;
 
@@ -24,6 +24,18 @@ message Message {
   }
   
   message Batch {
-    repeated bytes messages = 1; 
+    repeated BatchEntry entries = 1;
+  }
+
+  message BatchEntry {
+    string sender_addr = 1;
+    string sender_path = 2;
+    string receiver_addr = 3;
+    string receiver_path = 4;
+    string agent_addr = 5;
+    string agent_path = 6;
+    string type_name = 7;
+    bytes message = 8;
+    int32 priority = 9;
   }
 }

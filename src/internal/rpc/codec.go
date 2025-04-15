@@ -5,13 +5,17 @@ import (
 	"encoding/gob"
 )
 
+func init() {
+	gob.Register(&gobCodecMessage{})
+}
+
 // Codec 是用于对消息发送前和接收后进行编码和解码的接口
 type Codec interface {
 	// Encode 编码消息
-	Encode(m any) (bytes []byte, err error)
+	Encode(m any) (typeName string, bytes []byte, err error)
 
 	// Decode 解码消息
-	Decode(m any, data []byte) (res any, err error)
+	Decode(typeName string, data []byte) (m any, err error)
 }
 
 // CodecProvider 是用于创建 Codec 的接口
@@ -38,6 +42,10 @@ func newCodec() *codec {
 	return codec
 }
 
+type gobCodecMessage struct {
+	M any
+}
+
 type codec struct {
 	encoderBuf *bytes.Buffer
 	decoderBuf *bytes.Buffer
@@ -45,23 +53,26 @@ type codec struct {
 	decoder    *gob.Decoder
 }
 
-func (c *codec) Encode(v any) ([]byte, error) {
+func (c *codec) Encode(v any) (typeName string, data []byte, err error) {
+	v = &gobCodecMessage{M: v}
+
 	defer c.encoderBuf.Reset()
 
 	if err := c.encoder.Encode(v); err != nil {
-		return nil, err
+		return "", nil, err
 	}
-	var data = make([]byte, c.encoderBuf.Len())
+	data = make([]byte, c.encoderBuf.Len())
 	copy(data, c.encoderBuf.Bytes())
-	return data, nil
+	return "", data, nil
 }
 
-func (c *codec) Decode(dst any, data []byte) (t any, err error) {
+func (c *codec) Decode(typeName string, data []byte) (m any, err error) {
 	c.decoderBuf.Write(data)
 	defer c.decoderBuf.Reset()
 
+	var dst = new(gobCodecMessage)
 	if err := c.decoder.Decode(dst); err != nil {
-		return t, err
+		return nil, err
 	}
-	return dst, nil
+	return dst.M, nil
 }
